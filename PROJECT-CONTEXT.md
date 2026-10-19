@@ -1,21 +1,20 @@
 # Project Context
 
 ## Overview
-EndOfDay is a menu bar app made with Summon. Write its one job and who it is for here once they are settled.
+`EndOfDay` (`local.summon.end-of-day`) is a native Swift 6 + SwiftUI conversion of `RohiRIK/end-of-day-mac` built as a Summon plugin. It provides both a Control Center–style menu bar extra (`PanelView`) and a full companion `NavigationSplitView` window (`EndOfDayWindow`) plus a `Settings` window (`⌘,`).
 
 ## Current State
-- Lives in `~/Summon/end-of-day`, recorded in Summon's private list (`summon project list`).
-- Started from Summon's `menubar` template; layout in `README.md`. Gate: `scripts/check.sh`.
-- No GitHub repo yet. `summon project repo end-of-day` creates a private one after you approve it in a Summon
-  dialog, and adds CI (`.github/workflows/check.yml`, which runs `scripts/check.sh`).
+- Lives in `~/Summon/Apps/end-of-day`, registered in Summon's private project list (`summon project list`).
+- Automatically imports existing user configuration and analytics from `~/.config/end_of_day/` into `~/Library/Application Support/local.summon.end-of-day/` while keeping `~/.config/end_of_day/` synchronized when present.
+- Defaults active workdays to Sunday–Thursday (`[1, 2, 3, 4, 5]`).
+- Watches `~/.config/summon` (`current/theme.json` and `current-theme` -> `themes/<slug>/theme.json`) via `DispatchSource` to apply Summon's accent color and light/dark scheme live.
 
 ## Constraints
-- Swift 6 + SwiftUI (AppKit only where SwiftUI has no API), SwiftPM, macOS 15+, no third-party dependencies.
-- Core logic is test-first (swift-testing); views and `main` stay thin.
-- Panel = the app's job; its footer has only `Settings…` (⌘,) and `Quit` (⌘Q). Every preference lives in the Settings window.
-- Never create a public repo. Publishing is a separate choice, made only through the macos-plugins workspace's
-  `tools/publish-public.sh` (noreply identity, drops this file).
+- Swift 6 strict concurrency, SwiftUI + AppKit bridges (`FitWindowHeight`, `WindowAccessor`), SwiftPM, macOS 15+, zero third-party dependencies.
+- Core logic (`EndOfDayCore`) is Foundation-only and tested with `swift-testing` (`EndOfDayCoreTests`).
+- Panel footer strictly contains only `Settings…` (`⌘,`) and `Quit End of Day` (`⌘Q`); all preferences live in `SettingsView`.
 
 ## Recent History
-### 2026-10-19 — Started from the Summon menubar template
-- Copied from Summon's `menubar` template into `~/Summon/end-of-day`.
+### 2026-10-19 — Converted `RohiRIK/end-of-day-mac` into Summon menu bar + full window app
+- Built `EndOfDayCore`: `AppCatalog` (35+ categorized work apps with priority tiers), `EndOfDayConfig` & `ConfigStore` (v1/v2 migration + Application Support storage), `ScheduleEngine` (timer calculation, Sun–Thu work week, wake catch-up), `AnalyticsStore` (streak, 7-day bars, 90-day history), `TerminationEngine` (prioritized graceful + force-quit pipeline), and `SummonTheme`.
+- Built `EndOfDayUI`: `PanelView` (Control Center live module, inline countdown banner, running apps list, command rows), `EndOfDayWindow` (full `NavigationSplitView` window for `Today`, `Work Apps` catalog, and `Activity & Stats`), and `SettingsView` (`Schedule`, `Shutdown`, and `General` tabs).

@@ -13,8 +13,18 @@ struct EndOfDayApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Settings {
-            SettingsView()
+        Window("End of Day", id: EndOfDayModel.mainWindowID) {
+            EndOfDayWindow(model: model)
         }
+        .defaultSize(width: 860, height: 600)
+        .defaultLaunchBehavior(.suppressed)
+        .commands {
+            EndOfDayCommands(model: model)
+        }
+
+        Settings {
+            SettingsView(model: model)
+        }
+        .windowResizability(.contentSize)
     }
 }
