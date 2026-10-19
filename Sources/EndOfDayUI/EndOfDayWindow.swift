@@ -13,50 +13,28 @@ public struct EndOfDayWindow: View {
     public var body: some View {
         NavigationSplitView {
             List(SidebarSection.allCases, selection: $model.selectedSidebarSection) { section in
-                Label {
-                    HStack {
-                        Text(section.title)
-                        Spacer()
-                        if section == .today && !model.runningWorkApps.isEmpty {
-                            Text("\(model.runningWorkApps.count)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        } else if section == .apps {
-                            Text("\(model.config.apps.count)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } icon: {
-                    Image(systemName: section.symbol)
-                }
-                .tag(section)
+                Label(section.title, systemImage: section.symbol)
+                    .tag(section)
             }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 260)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
             .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(ScheduleEngine.formattedTime(hour: model.config.triggerHour, minute: model.config.triggerMinute)) · \(ScheduleEngine.activeDaysSummary(model.config.activeDays))")
-                        .font(.caption.weight(.medium))
-                        .monospacedDigit()
-                    Text("Theme: \(model.summonTheme.name)")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                Text("\(ScheduleEngine.formattedTime(hour: model.config.triggerHour, minute: model.config.triggerMinute)) · \(ScheduleEngine.activeDaysSummary(model.config.activeDays))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
             }
         } detail: {
             switch model.selectedSidebarSection {
-            case .today:
-                TodayDetailView(model: model)
             case .apps:
                 WorkAppsCatalogView(model: model)
             case .stats:
                 StatsDetailView(model: model)
             }
         }
-        .frame(minWidth: 760, minHeight: 500)
+        .frame(minWidth: 680, minHeight: 460)
         .summonThemed(model.summonTheme, enabled: useSummonTheme)
         .background(
             WindowAccessor { window in
@@ -83,56 +61,32 @@ public struct EndOfDayWindow: View {
     }
 }
 
-// MARK: - Today Detail View
+// MARK: - Work Apps View (Main View)
 
-private struct TodayDetailView: View {
+private struct WorkAppsCatalogView: View {
     @Bindable var model: EndOfDayModel
-
-    private var idleConfiguredApps: [String] {
-        let runningIDs = Set(model.runningWorkApps.map(\.bundleIdentifier))
-        return model.config.apps.filter { !runningIDs.contains($0) }
-    }
 
     var body: some View {
         List {
             if model.isCountingDown || model.isClosingApps {
-                Section("Live Shutdown") {
+                Section {
                     liveCountdownCard
                 }
             } else if let results = model.lastRunResults, !results.isEmpty {
-                Section("Last Run Report") {
+                Section {
                     lastRunReportCard(results)
                 }
             }
 
-            Section {
-                if model.runningWorkApps.isEmpty {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle")
-                            .foregroundStyle(.secondary)
-                        Text("No tracked work apps are currently running.")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                } else {
+            if !model.runningWorkApps.isEmpty && model.appSearchQuery.isEmpty {
+                Section("Open Now") {
                     ForEach(model.runningWorkApps) { app in
                         HStack(spacing: 10) {
-                            Circle()
-                                .fill(.green)
-                                .frame(width: 8, height: 8)
-                                .accessibilityLabel("Running")
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(verbatim: app.localizedName)
-                                    .font(.body.weight(.medium))
-                                Text("\(app.category) · \(priorityLabel(app.priority))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            AppIconView(bundleIdentifier: app.bundleIdentifier, size: 20)
+                            Text(verbatim: app.localizedName)
+                                .font(.body.weight(.medium))
                             Spacer()
-                            if let status = model.appCloseStatuses[app.bundleIdentifier] {
-                                statusBadge(status)
-                            }
-                            Button("Quit Now") {
+                            Button("Quit") {
                                 model.quitSingleApp(app.bundleIdentifier)
                             }
                             .controlSize(.small)
@@ -140,32 +94,31 @@ private struct TodayDetailView: View {
                         .padding(.vertical, 2)
                     }
                 }
-            } header: {
-                Text("Running Work Apps (\(model.runningWorkApps.count))")
             }
 
-            Section("Idle Tracked Apps (\(idleConfiguredApps.count))") {
-                if idleConfiguredApps.isEmpty {
-                    Text("All tracked apps are currently running or none selected.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(idleConfiguredApps, id: \.self) { bundleID in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(.quaternary)
-                                .frame(width: 8, height: 8)
-                            Text(verbatim: AppCatalog.displayName(for: bundleID, customNames: model.config.appDisplayNames))
-                            Spacer()
-                            Text(AppCatalog.category(for: bundleID))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
+            ForEach(model.filteredCatalogByCategory, id: \.category) { section in
+                Section(section.category) {
+                    ForEach(section.entries) { entry in
+                        WorkAppCatalogRow(
+                            entry: entry,
+                            isSelected: model.config.isSelected(entry.bundleIdentifier),
+                            isRunning: model.allRunningBundleIDs.contains(entry.bundleIdentifier),
+                            onToggle: {
+                                model.toggleApp(entry.bundleIdentifier, displayName: entry.canonicalName)
+                            }
+                        )
                     }
                 }
             }
         }
-        .navigationTitle("Today")
+        .overlay {
+            if model.filteredCatalogByCategory.isEmpty {
+                ContentUnavailableView.search(text: model.appSearchQuery)
+            }
+        }
+        .navigationTitle("Work Apps")
         .navigationSubtitle(model.scheduleSubtitle)
+        .searchable(text: $model.appSearchQuery, placement: .toolbar, prompt: "Search apps…")
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -179,24 +132,31 @@ private struct TodayDetailView: View {
                 .help(model.pausedToday ? "Resume today's schedule (⌘P)" : "Skip tonight without changing your schedule (⌘P)")
 
                 Menu {
-                    Button("Snooze 15 min") { model.snooze(minutes: 15) }
-                    Button("Snooze 30 min") { model.snooze(minutes: 30) }
-                    Button("Snooze 1 hour") { model.snooze(minutes: 60) }
+                    Toggle("Show Uninstalled Apps", isOn: $model.showUninstalledApps)
+                    Divider()
+                    Button("Select Installed Apps") { model.selectInstalledApps() }
+                    Button("Select Open Apps") { model.selectCurrentlyRunningApps() }
+                    Button("Clear Selection") { model.selectNoApps() }
                 } label: {
-                    Label("Snooze", systemImage: "zzz")
+                    Label("Options", systemImage: "ellipsis.circle")
                 }
-                .help("Snooze End of Day trigger")
+                .help("App list options")
             }
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     model.triggerNow()
                 } label: {
-                    Label("Run Now", systemImage: "sunset.fill")
+                    Label(
+                        model.runningWorkApps.isEmpty
+                            ? "Close Apps"
+                            : "Close \(model.runningWorkApps.count) Open",
+                        systemImage: "sunset.fill"
+                    )
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.runningWorkApps.isEmpty || model.isCountingDown || model.isClosingApps)
-                .help("Run End of Day countdown now (⌘R)")
+                .help("Close open work apps now (⌘R)")
             }
         }
     }
@@ -207,7 +167,7 @@ private struct TodayDetailView: View {
                 Label(
                     model.isClosingApps
                         ? "Closing \(model.runningWorkApps.count) work apps…"
-                        : "Work apps closing in \(model.countdownRemaining)s…",
+                        : "Closing in \(model.countdownRemaining)s…",
                     systemImage: "timer"
                 )
                 .font(.headline)
@@ -216,10 +176,7 @@ private struct TodayDetailView: View {
                 Button("Cancel") {
                     model.cancelCountdown()
                 }
-                Button("Snooze 30 min") {
-                    model.snooze(minutes: 30)
-                }
-                Button("Close Apps Now") {
+                Button("Close Now") {
                     model.confirmCloseNow()
                 }
                 .buttonStyle(.borderedProminent)
@@ -235,120 +192,22 @@ private struct TodayDetailView: View {
     private func lastRunReportCard(_ results: [AppTerminationResult]) -> some View {
         let succeeded = results.filter(\.success).count
         let failed = results.count - succeeded
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(
-                    failed == 0
-                        ? "Closed \(succeeded) work app\(succeeded == 1 ? "" : "s")"
-                        : "Closed \(succeeded), failed \(failed)",
-                    systemImage: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                )
-                .font(.headline)
-                .foregroundStyle(failed == 0 ? .green : .orange)
-                Spacer()
-                Button("Dismiss") {
-                    model.dismissRunResults()
-                }
-                .controlSize(.small)
+        return HStack {
+            Label(
+                failed == 0
+                    ? "Closed \(succeeded) work app\(succeeded == 1 ? "" : "s")"
+                    : "Closed \(succeeded), failed \(failed)",
+                systemImage: failed == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(failed == 0 ? .green : .orange)
+            Spacer()
+            Button("Dismiss") {
+                model.dismissRunResults()
             }
-            ForEach(results) { res in
-                HStack {
-                    Image(systemName: res.success ? "checkmark.circle" : "xmark.octagon.fill")
-                        .foregroundStyle(res.success ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
-                    Text(verbatim: res.appName)
-                    Spacer()
-                    Text(res.action.rawValue.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            .controlSize(.small)
         }
         .padding(.vertical, 4)
-    }
-
-    private func priorityLabel(_ priority: Int) -> String {
-        switch priority {
-        case 1: "Closes 1st"
-        case 3: "Closes Last"
-        default: "Normal Order"
-        }
-    }
-
-    @ViewBuilder
-    private func statusBadge(_ status: AppCloseStatus) -> some View {
-        switch status {
-        case .pending:
-            Text("Queued").font(.caption).foregroundStyle(.secondary)
-        case .closing:
-            ProgressView().controlSize(.small)
-        case .closed:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed:
-            Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
-        }
-    }
-}
-
-// MARK: - Work Apps Catalog View
-
-private struct WorkAppsCatalogView: View {
-    @Bindable var model: EndOfDayModel
-
-    var body: some View {
-        List {
-            ForEach(model.filteredCatalogByCategory, id: \.category) { section in
-                Section(section.category) {
-                    ForEach(section.entries) { entry in
-                        WorkAppCatalogRow(
-                            entry: entry,
-                            isSelected: model.config.isSelected(entry.bundleIdentifier),
-                            isRunning: model.allRunningBundleIDs.contains(entry.bundleIdentifier),
-                            isInstalled: model.installedBundleIDs.contains(entry.bundleIdentifier),
-                            priority: AppCatalog.priority(
-                                for: entry.bundleIdentifier,
-                                overrides: model.config.appPriorities
-                            ),
-                            onToggle: {
-                                model.toggleApp(entry.bundleIdentifier, displayName: entry.canonicalName)
-                            },
-                            onPriorityChange: { newPriority in
-                                model.setPriority(for: entry.bundleIdentifier, priority: newPriority)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-        .overlay {
-            if model.filteredCatalogByCategory.isEmpty {
-                ContentUnavailableView.search(text: model.appSearchQuery)
-            }
-        }
-        .navigationTitle("Work Apps")
-        .navigationSubtitle("\(model.config.apps.count) selected · \(model.runningWorkApps.count) running now")
-        .searchable(text: $model.appSearchQuery, placement: .toolbar, prompt: "Filter work apps…")
-        .toolbar {
-            ToolbarItemGroup {
-                Picker("Filter", selection: $model.appFilterScope) {
-                    ForEach(AppFilterScope.allCases) { scope in
-                        Text(scope.rawValue).tag(scope)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .help("Filter catalog by status")
-
-                Menu {
-                    Button("Select Installed Apps") { model.selectInstalledApps() }
-                    Button("Select Running Apps") { model.selectCurrentlyRunningApps() }
-                    Divider()
-                    Button("Select All Catalog Apps") { model.selectAllCatalogApps() }
-                    Button("Select None") { model.selectNoApps() }
-                } label: {
-                    Label("Selection", systemImage: "checklist")
-                }
-                .help("Batch select or clear work apps")
-            }
-        }
     }
 }
 
@@ -356,10 +215,7 @@ private struct WorkAppCatalogRow: View {
     let entry: AppEntry
     let isSelected: Bool
     let isRunning: Bool
-    let isInstalled: Bool
-    let priority: Int
     let onToggle: () -> Void
-    let onPriorityChange: (Int) -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -373,86 +229,59 @@ private struct WorkAppCatalogRow: View {
             }
             .labelsHidden()
 
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
-                    Text(verbatim: entry.canonicalName)
-                        .font(.body.weight(isSelected ? .medium : .regular))
-                    if isRunning {
-                        HStack(spacing: 4) {
-                            Circle().fill(.green).frame(width: 6, height: 6)
-                            Text("Running")
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if isInstalled {
-                        Text("Installed")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                Text(verbatim: entry.bundleIdentifier)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            AppIconView(bundleIdentifier: entry.bundleIdentifier, size: 20)
+
+            Text(verbatim: entry.canonicalName)
+                .font(.body)
 
             Spacer()
 
-            Picker(
-                "Order",
-                selection: Binding(
-                    get: { priority },
-                    set: { onPriorityChange($0) }
-                )
-            ) {
-                Text("1st (Comms)").tag(1)
-                Text("2nd (Standard)").tag(2)
-                Text("3rd (Dev/Save)").tag(3)
+            if isRunning {
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 7, height: 7)
+                    Text("Open")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 120)
-            .help("Shutdown order priority")
         }
         .padding(.vertical, 2)
     }
 }
 
-// MARK: - Activity & Stats Detail View
+// MARK: - History View
 
 private struct StatsDetailView: View {
     let model: EndOfDayModel
 
     private var sortedHistory: [AnalyticsEntry] {
-        model.analyticsEntries.sorted { $0.date > $1.date }
+        model.analyticsEntries
+            .filter { $0.appsClosed > 0 }
+            .sorted { $0.date > $1.date }
     }
 
     var body: some View {
         List {
-            if model.summary.ranToday {
-                Section {
-                    Label("End of Day has already run today.", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
-            }
-
-            Section("Last 7 Days (Apps Closed)") {
+            Section("Last 7 Days") {
                 SevenDayBarChartView(bars: model.summary.sevenDayBars)
                     .padding(.vertical, 8)
             }
 
-            Section("Recent Runs (\(sortedHistory.count))") {
+            Section("Past Runs") {
                 if sortedHistory.isEmpty {
                     ContentUnavailableView(
                         "No Runs Yet",
                         systemImage: "clock.arrow.circlepath",
-                        description: Text("When End of Day closes your work apps, each run is recorded here.")
+                        description: Text("When End of Day closes your work apps, each run appears here.")
                     )
                     .padding(.vertical, 20)
                 } else {
                     ForEach(sortedHistory) { entry in
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundStyle(.secondary)
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 8) {
                                     Text(verbatim: entry.date)
@@ -464,7 +293,7 @@ private struct StatsDetailView: View {
                                     }
                                 }
                                 if !entry.closedAppNames.isEmpty {
-                                    Text(verbatim: entry.closedAppNames.joined(separator: " · "))
+                                    Text(verbatim: entry.closedAppNames.joined(separator: ", "))
                                         .font(.subheadline)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(1)
@@ -480,9 +309,9 @@ private struct StatsDetailView: View {
                 }
             }
         }
-        .navigationTitle("Activity & Stats")
+        .navigationTitle("History")
         .navigationSubtitle(
-            "Streak: \(model.summary.streak)d · This month: \(model.summary.monthClosed) closed · All time: \(model.summary.totalClosed) apps (\(model.summary.totalRuns) runs)"
+            "\(model.summary.streak) day streak · \(model.summary.totalClosed) apps closed"
         )
     }
 }
@@ -538,13 +367,13 @@ public struct EndOfDayCommands: Commands {
     public var body: some Commands {
         CommandGroup(after: .newItem) {
             Button("Open End of Day Window") {
-                openMainWindow(model: model, section: .today, openWindow: openWindow)
+                openMainWindow(model: model, section: .apps, openWindow: openWindow)
             }
             .keyboardShortcut("o", modifiers: .command)
         }
 
         CommandMenu("End of Day") {
-            Button("Run End of Day Now") {
+            Button("Close Open Work Apps Now") {
                 model.triggerNow()
             }
             .keyboardShortcut("r", modifiers: .command)
@@ -563,24 +392,19 @@ public struct EndOfDayCommands: Commands {
 
             Divider()
 
-            Button("Today Overview") {
-                openMainWindow(model: model, section: .today, openWindow: openWindow)
+            Button("Work Apps") {
+                openMainWindow(model: model, section: .apps, openWindow: openWindow)
             }
             .keyboardShortcut("1", modifiers: .command)
 
-            Button("Work Apps Catalog") {
-                openMainWindow(model: model, section: .apps, openWindow: openWindow)
-            }
-            .keyboardShortcut("2", modifiers: .command)
-
-            Button("Activity & Stats") {
+            Button("History") {
                 openMainWindow(model: model, section: .stats, openWindow: openWindow)
             }
-            .keyboardShortcut("3", modifiers: .command)
+            .keyboardShortcut("2", modifiers: .command)
         }
     }
 }
 
-#Preview("Main Window - Today") {
+#Preview("Main Window") {
     EndOfDayWindow(model: .preview)
 }

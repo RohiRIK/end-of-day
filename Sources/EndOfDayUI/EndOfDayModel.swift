@@ -5,7 +5,6 @@ import Observation
 import UserNotifications
 
 public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
-    case today
     case apps
     case stats
 
@@ -13,28 +12,17 @@ public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
-        case .today: "Today"
         case .apps: "Work Apps"
-        case .stats: "Activity & Stats"
+        case .stats: "History"
         }
     }
 
     public var symbol: String {
         switch self {
-        case .today: "sunset.fill"
         case .apps: "square.grid.2x2"
         case .stats: "chart.bar.xaxis"
         }
     }
-}
-
-public enum AppFilterScope: String, CaseIterable, Identifiable, Sendable {
-    case all = "All"
-    case selected = "Selected"
-    case running = "Running"
-    case installed = "Installed"
-
-    public var id: String { rawValue }
 }
 
 public enum EndOfDaySettings {
@@ -73,9 +61,9 @@ public final class EndOfDayModel {
     public var lastError: String?
 
     // Window navigation state
-    public var selectedSidebarSection: SidebarSection = .today
+    public var selectedSidebarSection: SidebarSection = .apps
     public var appSearchQuery: String = ""
-    public var appFilterScope: AppFilterScope = .all
+    public var showUninstalledApps: Bool = false
 
     private let configStore: ConfigStore
     private let analyticsStore: AnalyticsStore
@@ -153,22 +141,17 @@ public final class EndOfDayModel {
         let base = AppCatalog.entriesByCategory()
         return base.compactMap { group in
             let filtered = group.entries.filter { entry in
-                let matchesQuery = query.isEmpty
-                    || entry.canonicalName.lowercased().contains(query)
-                    || entry.bundleIdentifier.lowercased().contains(query)
-                    || entry.category.lowercased().contains(query)
-                guard matchesQuery else { return false }
-
-                switch appFilterScope {
-                case .all:
-                    return true
-                case .selected:
-                    return config.isSelected(entry.bundleIdentifier)
-                case .running:
-                    return allRunningBundleIDs.contains(entry.bundleIdentifier)
-                case .installed:
-                    return installedBundleIDs.contains(entry.bundleIdentifier)
+                if !query.isEmpty {
+                    return entry.canonicalName.lowercased().contains(query)
+                        || entry.category.lowercased().contains(query)
                 }
+                if showUninstalledApps {
+                    return true
+                }
+                let id = entry.bundleIdentifier
+                return installedBundleIDs.contains(id)
+                    || config.isSelected(id)
+                    || allRunningBundleIDs.contains(id)
             }
             guard !filtered.isEmpty else { return nil }
             return (category: group.category, entries: filtered)

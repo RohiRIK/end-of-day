@@ -35,7 +35,7 @@ public struct MenuBarLabel: View {
     }
 }
 
-/// The menu bar panel: Control Center live module on top, quick actions, and Settings… / Quit in the footer.
+/// Calm, flat menu bar panel: header with schedule, open work apps list (when any are running), and clean menu commands.
 public struct PanelView: View {
     let model: EndOfDayModel
     @Environment(\.openSettings) private var openSettings
@@ -51,10 +51,9 @@ public struct PanelView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            liveStatusModule
-                .padding(.horizontal, 4)
-                .padding(.top, 4)
-                .padding(.bottom, 4)
+            headerSection
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
 
             if let error = model.lastError {
                 Text(verbatim: error)
@@ -65,17 +64,18 @@ public struct PanelView: View {
             }
 
             if model.isCountingDown || model.isClosingApps {
-                countdownModule
+                countdownBanner
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
             } else if !model.runningWorkApps.isEmpty {
-                runningAppsSection
+                PanelDivider()
+                openAppsSection
             }
 
             PanelDivider()
 
             CommandRow(
-                title: "Run End of Day Now",
+                title: closeNowLabel,
                 systemImage: "sunset.fill",
                 shortcut: "⌘R"
             ) {
@@ -84,14 +84,20 @@ public struct PanelView: View {
             .disabled(model.runningWorkApps.isEmpty || model.isCountingDown || model.isClosingApps)
 
             CommandRow(
-                title: model.pausedToday ? "Resume Today" : "Pause Today",
+                title: model.pausedToday ? "Resume Schedule Today" : "Pause Schedule Today",
                 systemImage: model.pausedToday ? "play.circle" : "pause.circle",
                 shortcut: "⌘P"
             ) {
                 model.togglePauseToday()
             }
 
-            snoozeRow
+            CommandRow(
+                title: "Snooze 30 Minutes",
+                systemImage: "zzz",
+                shortcut: nil
+            ) {
+                model.snooze(minutes: 30)
+            }
 
             PanelDivider()
 
@@ -100,23 +106,7 @@ public struct PanelView: View {
                 systemImage: "macwindow",
                 shortcut: "⌘O"
             ) {
-                showMainWindow(section: .today)
-            }
-
-            CommandRow(
-                title: "Select Work Apps (\(model.config.apps.count))…",
-                systemImage: "square.grid.2x2",
-                shortcut: nil
-            ) {
                 showMainWindow(section: .apps)
-            }
-
-            CommandRow(
-                title: "Activity & Stats…",
-                systemImage: "chart.bar.xaxis",
-                shortcut: nil
-            ) {
-                showMainWindow(section: .stats)
             }
 
             PanelDivider()
@@ -130,7 +120,7 @@ public struct PanelView: View {
             }
         }
         .padding(6)
-        .frame(width: 316)
+        .frame(width: 280)
         .fixedSize(horizontal: false, vertical: true)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
         .background(FitWindowHeight(height: height))
@@ -158,7 +148,7 @@ public struct PanelView: View {
             case "p":
                 model.togglePauseToday()
             case "o":
-                showMainWindow(section: .today)
+                showMainWindow(section: .apps)
             case ",":
                 showSettings()
             case "q":
@@ -170,108 +160,49 @@ public struct PanelView: View {
         }
     }
 
-    // MARK: - Control Center Live Module
+    private var closeNowLabel: String {
+        let count = model.runningWorkApps.count
+        guard count > 0 else { return "Close Work Apps Now" }
+        return "Close \(count) Open App\(count == 1 ? "" : "s") Now"
+    }
 
-    private var liveStatusModule: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: model.pausedToday ? "pause.fill" : "sunset.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.accentColor))
+    // MARK: - Clean Flat Header
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("End of Day")
-                            .font(.body.weight(.semibold))
-                        Spacer()
-                        Text(ScheduleEngine.activeDaysSummary(model.config.activeDays))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    TimelineView(.periodic(from: .now, by: 15)) { context in
-                        Text(
-                            ScheduleEngine.nextRunSummary(
-                                nextFireDate: model.nextFireDate,
-                                pausedToday: model.pausedToday,
-                                snoozedUntil: model.snoozedUntil,
-                                now: context.date
-                            )
+    private var headerSection: some View {
+        HStack(spacing: 10) {
+            Image(systemName: model.pausedToday ? "pause.fill" : "sunset.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.accentColor))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("End of Day")
+                    .font(.body.weight(.semibold))
+
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    Text(
+                        ScheduleEngine.nextRunSummary(
+                            nextFireDate: model.nextFireDate,
+                            pausedToday: model.pausedToday,
+                            snoozedUntil: model.snoozedUntil,
+                            now: context.date
                         )
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                    }
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
                 }
             }
 
-            Grid(horizontalSpacing: 6, verticalSpacing: 6) {
-                GridRow {
-                    statCell(
-                        symbol: "app.badge.checkmark",
-                        label: "Running",
-                        value: "\(model.runningWorkApps.count) of \(model.config.apps.count)",
-                        dotColor: model.runningWorkApps.isEmpty ? .secondary : .green
-                    )
-                    statCell(
-                        symbol: "flame.fill",
-                        label: "Streak",
-                        value: "\(model.summary.streak) day\(model.summary.streak == 1 ? "" : "s")",
-                        dotColor: nil
-                    )
-                }
-                GridRow {
-                    statCell(
-                        symbol: "calendar",
-                        label: "This Month",
-                        value: "\(model.summary.monthClosed) closed",
-                        dotColor: nil
-                    )
-                    statCell(
-                        symbol: "chart.bar.fill",
-                        label: "All Time",
-                        value: "\(model.summary.totalClosed) · \(model.summary.totalRuns) runs",
-                        dotColor: nil
-                    )
-                }
-            }
+            Spacer(minLength: 0)
         }
-        .padding(12)
-        .background(.quinary, in: .rect(cornerRadius: 12, style: .continuous))
     }
 
-    private func statCell(symbol: String, label: String, value: String, dotColor: Color?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Image(systemName: symbol)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if let dotColor {
-                    Circle()
-                        .fill(dotColor)
-                        .frame(width: 6, height: 6)
-                }
-            }
-            Text(value)
-                .font(.callout.weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quinary, in: .rect(cornerRadius: 8, style: .continuous))
-    }
+    // MARK: - Countdown Banner
 
-    // MARK: - Countdown Module
-
-    private var countdownModule: some View {
+    private var countdownBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label(
@@ -281,9 +212,6 @@ public struct PanelView: View {
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 Spacer()
-                Text("\(model.runningWorkApps.count) app\(model.runningWorkApps.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             ProgressView(
@@ -295,11 +223,6 @@ public struct PanelView: View {
             HStack(spacing: 6) {
                 Button("Cancel") {
                     model.cancelCountdown()
-                }
-                .controlSize(.small)
-
-                Button("Snooze 30m") {
-                    model.snooze(minutes: 30)
                 }
                 .controlSize(.small)
 
@@ -317,51 +240,18 @@ public struct PanelView: View {
         .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 10, style: .continuous))
     }
 
-    // MARK: - Running Apps Section
+    // MARK: - Open Work Apps Section
 
-    private var runningAppsSection: some View {
+    private var openAppsSection: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                PanelSectionHeader(title: "Running Work Apps")
-                Spacer()
-                if model.runningWorkApps.count > 4 {
-                    Button("+\(model.runningWorkApps.count - 4) more") {
-                        showMainWindow(section: .today)
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                }
-            }
+            PanelSectionHeader(title: "Open Now")
 
-            ForEach(model.runningWorkApps.prefix(4)) { app in
+            ForEach(model.runningWorkApps.prefix(5)) { app in
                 RunningAppPanelRow(app: app) {
                     model.quitSingleApp(app.bundleIdentifier)
                 }
             }
         }
-    }
-
-    // MARK: - Snooze Quick Row
-
-    private var snoozeRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "zzz")
-                .frame(width: 16)
-                .foregroundStyle(.secondary)
-            Text("Snooze")
-            Spacer()
-            ForEach([15, 30, 60], id: \.self) { mins in
-                Button(mins == 60 ? "1h" : "\(mins)m") {
-                    model.snooze(minutes: mins)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-            }
-        }
-        .padding(.horizontal, 8)
-        .frame(minHeight: 26)
     }
 
     // MARK: - Navigation Helpers
@@ -385,10 +275,7 @@ private struct RunningAppPanelRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(.green)
-                .frame(width: 7, height: 7)
-                .accessibilityLabel("Running")
+            AppIconView(bundleIdentifier: app.bundleIdentifier, size: 16)
             Text(verbatim: app.localizedName)
                 .lineLimit(1)
             Spacer()
@@ -397,9 +284,10 @@ private struct RunningAppPanelRow: View {
                     .controlSize(.mini)
                     .help("Quit \(app.localizedName) now")
             } else {
-                Text(app.category)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Circle()
+                    .fill(.green)
+                    .frame(width: 6, height: 6)
+                    .accessibilityLabel("Open")
             }
         }
         .padding(.horizontal, 8)

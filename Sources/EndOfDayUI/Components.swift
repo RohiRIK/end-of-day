@@ -91,6 +91,26 @@ struct PanelSectionHeader: View {
     }
 }
 
+/// Displays the native macOS application icon for a bundle identifier, or a clean fallback symbol.
+struct AppIconView: View {
+    let bundleIdentifier: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: "app.dashed")
+                .font(.system(size: size * 0.72))
+                .foregroundStyle(.tertiary)
+                .frame(width: size, height: size)
+        }
+    }
+}
+
 /// Resizes the menu bar window to the panel's height, keeping its top edge under the menu bar.
 struct FitWindowHeight: NSViewRepresentable {
     let height: CGFloat

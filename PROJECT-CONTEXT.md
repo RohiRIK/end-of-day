@@ -17,4 +17,5 @@
 ## Recent History
 ### 2026-10-19 — Converted `RohiRIK/end-of-day-mac` into Summon menu bar + full window app
 - Built `EndOfDayCore`: `AppCatalog` (35+ categorized work apps with priority tiers), `EndOfDayConfig` & `ConfigStore` (v1/v2 migration + Application Support storage), `ScheduleEngine` (timer calculation, Sun–Thu work week, wake catch-up), `AnalyticsStore` (streak, 7-day bars, 90-day history), `TerminationEngine` (prioritized graceful + force-quit pipeline), and `SummonTheme`.
-- Built `EndOfDayUI`: `PanelView` (Control Center live module, inline countdown banner, running apps list, command rows), `EndOfDayWindow` (full `NavigationSplitView` window for `Today`, `Work Apps` catalog, and `Activity & Stats`), and `SettingsView` (`Schedule`, `Shutdown`, and `General` tabs).
+- Built `EndOfDayUI`: `PanelView` (flat header with schedule, open apps list with native app icons, and clean menu commands), `EndOfDayWindow` (clean 2-section `NavigationSplitView` window for `Work Apps` and `History` with native app icons and zero bundle-ID/picker clutter), and `SettingsView` (`Schedule`, `Shutdown`, and `General` tabs).
+
