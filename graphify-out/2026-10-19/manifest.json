@@ -40,23 +40,23 @@
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/Components.swift": {
-    "mtime": 1792416996.875681,
-    "ast_hash": "229495dae1c696ea59c2f0013ee392f8",
+    "mtime": 1792418349.5565221,
+    "ast_hash": "e3cddbad452199b85215bdd32e6ed388",
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/EndOfDayModel.swift": {
-    "mtime": 1792417366.7076645,
-    "ast_hash": "f261548569c425edf163401cb8395449",
+    "mtime": 1792418415.3243911,
+    "ast_hash": "d74fe8653feee12d5dceed6b66743d13",
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/EndOfDayWindow.swift": {
-    "mtime": 1792417365.08073,
-    "ast_hash": "ba89fa1a2237d6192f4e6242c4dc3298",
+    "mtime": 1792418495.9817994,
+    "ast_hash": "c88255ea34b4e45bd6561add64dbe2f0",
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/PanelView.swift": {
-    "mtime": 1792417046.0074377,
-    "ast_hash": "2ee0b7ad677f59161aaccb724f80bd33",
+    "mtime": 1792418442.784078,
+    "ast_hash": "af6da9c2e2c436f3d80073c05f62e5b2",
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/SettingsView.swift": {
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "PROJECT-CONTEXT.md": {
-    "mtime": 1792417234.0630715,
-    "ast_hash": "623a9d6354d0f9abab5cd1ce0b233372",
+    "mtime": 1792418532.950069,
+    "ast_hash": "69dc316db236b9fac0ea0f5d3d5ca041",
     "semantic_hash": ""
   },
   "README.md": {

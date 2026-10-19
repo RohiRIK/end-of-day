@@ -1,6 +1,6 @@
 {
   "0": "EndOfDayModel",
-  "1": "View",
+  "1": "Components.swift",
   "2": "ConfigStore",
   "3": "Sendable",
   "4": "EndOfDayConfig",
@@ -8,15 +8,19 @@
   "6": "ScheduleEngine",
   "7": "SummonTheme",
   "8": "AppEntry",
-  "9": "WindowAccessor",
+  "9": "Foundation",
   "10": "Project Context",
   "11": "EndOfDay",
-  "12": "SettingsView.swift",
-  "13": "SummonTheme",
+  "12": "View",
+  "13": "AnalyticsEntry",
   "14": "Color",
   "15": "Date",
   "16": "Set",
   "17": "String",
   "18": "Color",
-  "19": "SummonTheme"
+  "19": "SummonTheme",
+  "20": "AppEntry",
+  "21": "AppTerminationResult",
+  "22": "Int",
+  "23": "Void"
 }

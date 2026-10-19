@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   "Sources/EndOfDay/EndOfDayApp.swift": {
-    "mtime": 1792417167.2257452,
-    "ast_hash": "9a97317c9ab17251d904a711e3e8a6e4",
+    "mtime": 1792418690.9556012,
+    "ast_hash": "21a450faa24a16471f685324f80999e4",
     "semantic_hash": ""
   },
   "Sources/EndOfDayCore/AnalyticsStore.swift": {
@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/EndOfDayWindow.swift": {
-    "mtime": 1792418495.9817994,
-    "ast_hash": "c88255ea34b4e45bd6561add64dbe2f0",
+    "mtime": 1792418823.41271,
+    "ast_hash": "3ba69416b9a4ac20376fd61300c7aa37",
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/PanelView.swift": {
@@ -60,8 +60,8 @@
     "semantic_hash": ""
   },
   "Sources/EndOfDayUI/SettingsView.swift": {
-    "mtime": 1792417150.3387992,
-    "ast_hash": "e0346a736a51ae380606abe8855c7e23",
+    "mtime": 1792418824.4707403,
+    "ast_hash": "1f7f35ec15f62f948fcea3de375d0a7f",
     "semantic_hash": ""
   },
   "Tests/EndOfDayCoreTests/EndOfDayCoreTests.swift": {

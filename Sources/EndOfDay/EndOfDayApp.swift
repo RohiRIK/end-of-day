@@ -3,8 +3,19 @@ import EndOfDayCore
 import EndOfDayUI
 import SwiftUI
 
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var openWindowAction: (() -> Void)?
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openWindowAction?()
+        return true
+    }
+}
+
 @main
 struct EndOfDayApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
     @State private var model = EndOfDayModel()
 
     init() {
@@ -23,6 +34,9 @@ struct EndOfDayApp: App {
     var body: some Scene {
         MenuBarExtra {
             PanelView(model: model)
+                .onAppear {
+                    setupReopenHandler()
+                }
         } label: {
             MenuBarLabel(model: model)
         }
@@ -30,6 +44,9 @@ struct EndOfDayApp: App {
 
         Window("End of Day", id: EndOfDayModel.mainWindowID) {
             EndOfDayWindow(model: model)
+                .onAppear {
+                    setupReopenHandler()
+                }
         }
         .defaultSize(width: 780, height: 520)
         .defaultLaunchBehavior(.suppressed)
@@ -41,6 +58,18 @@ struct EndOfDayApp: App {
             SettingsView(model: model)
         }
         .windowResizability(.contentSize)
+    }
+
+    private func setupReopenHandler() {
+        appDelegate.openWindowAction = {
+            openMainWindow(model: model, section: .apps, openWindow: openWindow)
+        }
+        let args = CommandLine.arguments
+        if args.contains("--window") || args.contains("--open") || args.contains("-o") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                openMainWindow(model: model, section: .apps, openWindow: openWindow)
+            }
+        }
     }
 }
 
