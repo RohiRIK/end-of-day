@@ -78,24 +78,6 @@ private struct WorkAppsCatalogView: View {
                 }
             }
 
-            if !model.runningWorkApps.isEmpty && model.appSearchQuery.isEmpty {
-                Section("Open Now") {
-                    ForEach(model.runningWorkApps) { app in
-                        HStack(spacing: 10) {
-                            AppIconView(bundleIdentifier: app.bundleIdentifier, size: 20)
-                            Text(verbatim: app.localizedName)
-                                .font(.body.weight(.medium))
-                            Spacer()
-                            Button("Quit") {
-                                model.quitSingleApp(app.bundleIdentifier)
-                            }
-                            .controlSize(.small)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-            }
-
             ForEach(model.filteredCatalogByCategory, id: \.category) { section in
                 Section(section.category) {
                     ForEach(section.entries) { entry in
@@ -105,6 +87,9 @@ private struct WorkAppsCatalogView: View {
                             isRunning: model.allRunningBundleIDs.contains(entry.bundleIdentifier),
                             onToggle: {
                                 model.toggleApp(entry.bundleIdentifier, displayName: entry.canonicalName)
+                            },
+                            onQuit: {
+                                model.quitSingleApp(entry.bundleIdentifier)
                             }
                         )
                     }
@@ -116,7 +101,7 @@ private struct WorkAppsCatalogView: View {
                 ContentUnavailableView.search(text: model.appSearchQuery)
             }
         }
-        .navigationTitle("Work Apps")
+        .navigationTitle("End of Day")
         .navigationSubtitle(model.scheduleSubtitle)
         .searchable(text: $model.appSearchQuery, placement: .toolbar, prompt: "Search apps…")
         .toolbar {
@@ -216,6 +201,7 @@ private struct WorkAppCatalogRow: View {
     let isSelected: Bool
     let isRunning: Bool
     let onToggle: () -> Void
+    let onQuit: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -237,13 +223,17 @@ private struct WorkAppCatalogRow: View {
             Spacer()
 
             if isRunning {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 7, height: 7)
-                    Text("Open")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 7, height: 7)
+                        Text("Open")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("Quit", action: onQuit)
+                        .controlSize(.small)
                 }
             }
         }
@@ -336,12 +326,14 @@ private struct SevenDayBarChartView: View {
                         let height = max(ratio * geo.size.height, bar.count > 0 ? 8 : 3)
                         VStack {
                             Spacer(minLength: 0)
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .fill(bar.count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+                                .frame(maxWidth: 32)
                                 .frame(height: height)
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(height: 96)
+                    .frame(height: 88)
 
                     Text(bar.shortLabel)
                         .font(.caption.weight(bar.isToday ? .semibold : .regular))
@@ -350,7 +342,7 @@ private struct SevenDayBarChartView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: 140)
+        .frame(height: 132)
     }
 }
 

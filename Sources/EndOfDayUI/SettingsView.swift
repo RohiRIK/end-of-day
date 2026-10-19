@@ -96,11 +96,15 @@ private struct ScheduleSettingsTab: View {
                         } label: {
                             Text(day.short)
                                 .font(.callout.weight(isOn ? .semibold : .regular))
+                                .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 5)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(isOn ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+                                )
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(isOn ? Color.accentColor : Color.secondary.opacity(0.25))
+                        .buttonStyle(.plain)
                     }
                 }
 
