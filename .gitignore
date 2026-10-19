@@ -2,3 +2,6 @@
 build/
 .swiftpm/
 .DS_Store
+
+# Generated knowledge graph (graphify), not source
+graphify-out/
