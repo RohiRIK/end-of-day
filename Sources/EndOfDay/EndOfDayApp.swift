@@ -39,6 +39,9 @@ struct EndOfDayApp: App {
                 }
         } label: {
             MenuBarLabel(model: model)
+                .onAppear {
+                    setupReopenHandler()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -49,7 +52,6 @@ struct EndOfDayApp: App {
                 }
         }
         .defaultSize(width: 780, height: 520)
-        .defaultLaunchBehavior(.suppressed)
         .commands {
             EndOfDayCommands(model: model)
         }
@@ -62,12 +64,12 @@ struct EndOfDayApp: App {
 
     private func setupReopenHandler() {
         appDelegate.openWindowAction = {
-            openMainWindow(model: model, section: .apps, openWindow: openWindow)
+            openMainWindow(model: model, section: .plan, openWindow: openWindow)
         }
         let args = CommandLine.arguments
         if args.contains("--window") || args.contains("--open") || args.contains("-o") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                openMainWindow(model: model, section: .apps, openWindow: openWindow)
+                openMainWindow(model: model, section: .plan, openWindow: openWindow)
             }
         }
     }
@@ -92,7 +94,18 @@ enum SnapshotExporter {
             to: dir.appendingPathComponent("eod-panel.png")
         )
 
-        // 2. Main Window — Work Apps
+        // 2. Main Window — Closing Plan
+        model.selectedSidebarSection = .plan
+        await snapshotView(
+            EndOfDayWindow(model: model),
+            size: NSSize(width: 780, height: 520),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            title: "End of Day",
+            captureThemeFrame: true,
+            to: dir.appendingPathComponent("eod-window-plan.png")
+        )
+
+        // 3. Main Window — App Library
         model.selectedSidebarSection = .apps
         await snapshotView(
             EndOfDayWindow(model: model),
@@ -103,7 +116,7 @@ enum SnapshotExporter {
             to: dir.appendingPathComponent("eod-window-apps.png")
         )
 
-        // 3. Main Window — History
+        // 4. Main Window — History
         model.selectedSidebarSection = .stats
         await snapshotView(
             EndOfDayWindow(model: model),

@@ -183,4 +183,79 @@ public enum AppCatalog {
         }
         return installed
     }
+
+    /// Infers a human-friendly category from an application bundle ID or name.
+    public static func inferCategory(bundleIdentifier: String, name: String) -> String {
+        if let existing = entry(matching: bundleIdentifier)?.category {
+            return existing
+        }
+        let lower = (bundleIdentifier + " " + name).lowercased()
+        if lower.contains("outlook") || lower.contains("teams") || lower.contains("word") || lower.contains("excel") || lower.contains("powerpoint") || lower.contains("office") {
+            return "Office"
+        }
+        if lower.contains("slack") || lower.contains("zoom") || lower.contains("telegram") || lower.contains("whatsapp") || lower.contains("discord") || lower.contains("signal") || lower.contains("loom") || lower.contains("message") {
+            return "Communication"
+        }
+        if lower.contains("chrome") || lower.contains("safari") || lower.contains("firefox") || lower.contains("edge") || lower.contains("browser") || lower.contains("arc") || lower.contains("brave") {
+            return "Browsers"
+        }
+        if lower.contains("notion") || lower.contains("obsidian") || lower.contains("todoist") || lower.contains("things") || lower.contains("note") || lower.contains("calendar") || lower.contains("remind") || lower.contains("linear") {
+            return "Productivity"
+        }
+        if lower.contains("code") || lower.contains("terminal") || lower.contains("iterm") || lower.contains("ghostty") || lower.contains("xcode") || lower.contains("zed") || lower.contains("git") || lower.contains("sublime") || lower.contains("cursor") {
+            return "Dev"
+        }
+        if lower.contains("figma") || lower.contains("sketch") || lower.contains("photoshop") || lower.contains("illustrator") || lower.contains("design") || lower.contains("canva") {
+            return "Design"
+        }
+        if lower.contains("remote") || lower.contains("anydesk") || lower.contains("teamviewer") || lower.contains("vpn") || lower.contains("connect") || lower.contains("protect") {
+            return "Remote/IT"
+        }
+        return "Other"
+    }
+
+    /// Dynamically discovers all installed .app bundles on this Mac from standard application folders.
+    public static func discoverInstalledApplications(searchDirectories: [URL]? = nil) -> [AppEntry] {
+        let fm = FileManager.default
+        let dirs: [URL]
+        if let searchDirectories {
+            dirs = searchDirectories
+        } else {
+            var defaults = [
+                URL(fileURLWithPath: "/Applications"),
+                URL(fileURLWithPath: "/System/Applications")
+            ]
+            let userApps = fm.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+            if fm.fileExists(atPath: userApps.path) {
+                defaults.append(userApps)
+            }
+            dirs = defaults
+        }
+
+        var foundByID: [String: AppEntry] = [:]
+        for dir in dirs {
+            guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { continue }
+            for item in items where item.pathExtension == "app" {
+                let bundleName = item.deletingPathExtension().lastPathComponent
+                guard let bundle = Bundle(url: item), let bid = bundle.bundleIdentifier, !bid.isEmpty else {
+                    continue
+                }
+                if systemAppsDenyList.contains(bid) || bid.hasPrefix("com.apple.WebKit.") {
+                    continue
+                }
+                if let known = bundleIdentifierIndex[bid] {
+                    foundByID[bid] = known
+                } else {
+                    let cat = inferCategory(bundleIdentifier: bid, name: bundleName)
+                    foundByID[bid] = AppEntry(
+                        bundleName: bundleName,
+                        canonicalName: bundleName,
+                        category: cat,
+                        bundleIdentifier: bid
+                    )
+                }
+            }
+        }
+        return Array(foundByID.values).sorted { $0.canonicalName.localizedCaseInsensitiveCompare($1.canonicalName) == .orderedAscending }
+    }
 }

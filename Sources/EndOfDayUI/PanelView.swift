@@ -106,7 +106,7 @@ public struct PanelView: View {
                 systemImage: "macwindow",
                 shortcut: "⌘O"
             ) {
-                showMainWindow(section: .apps)
+                showMainWindow(section: .plan)
             }
 
             PanelDivider()
@@ -148,7 +148,7 @@ public struct PanelView: View {
             case "p":
                 model.togglePauseToday()
             case "o":
-                showMainWindow(section: .apps)
+                showMainWindow(section: .plan)
             case ",":
                 showSettings()
             case "q":
