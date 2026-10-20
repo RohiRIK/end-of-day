@@ -22,6 +22,22 @@ struct EndOfDayCoreTests {
         #expect(AppCatalog.priority(for: "com.microsoft.VSCode", overrides: ["com.microsoft.VSCode": 1]) == 1)
     }
 
+    @Test("AppCatalog discovers installed applications and infers categories")
+    func appCatalogDiscovery() {
+        let catSlack = AppCatalog.inferCategory(bundleIdentifier: "com.tinyspeck.slackmacgap", name: "Slack")
+        #expect(catSlack == "Communication")
+        let catCode = AppCatalog.inferCategory(bundleIdentifier: "com.microsoft.VSCode", name: "Visual Studio Code")
+        #expect(catCode == "Dev")
+        let catChrome = AppCatalog.inferCategory(bundleIdentifier: "com.google.Chrome", name: "Google Chrome")
+        #expect(catChrome == "Browsers")
+        let catExcel = AppCatalog.inferCategory(bundleIdentifier: "com.microsoft.Excel", name: "Microsoft Excel")
+        #expect(catExcel == "Office")
+
+        let discovered = AppCatalog.discoverInstalledApplications()
+        #expect(!discovered.isEmpty)
+        #expect(discovered.allSatisfy { !AppCatalog.systemAppsDenyList.contains($0.bundleIdentifier) })
+    }
+
     @Test("EndOfDayConfig normalizes v1 app names to bundle IDs and preserves v2 fields")
     func configMigrationAndPersistence() throws {
         let v1JSON = """

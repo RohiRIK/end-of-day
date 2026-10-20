@@ -92,7 +92,18 @@ enum SnapshotExporter {
             to: dir.appendingPathComponent("eod-panel.png")
         )
 
-        // 2. Main Window — Work Apps
+        // 2. Main Window — Closing Plan
+        model.selectedSidebarSection = .plan
+        await snapshotView(
+            EndOfDayWindow(model: model),
+            size: NSSize(width: 780, height: 520),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            title: "End of Day",
+            captureThemeFrame: true,
+            to: dir.appendingPathComponent("eod-window-plan.png")
+        )
+
+        // 3. Main Window — App Library
         model.selectedSidebarSection = .apps
         await snapshotView(
             EndOfDayWindow(model: model),
@@ -103,7 +114,7 @@ enum SnapshotExporter {
             to: dir.appendingPathComponent("eod-window-apps.png")
         )
 
-        // 3. Main Window — History
+        // 4. Main Window — History
         model.selectedSidebarSection = .stats
         await snapshotView(
             EndOfDayWindow(model: model),

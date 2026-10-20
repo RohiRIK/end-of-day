@@ -5,6 +5,7 @@ import Observation
 import UserNotifications
 
 public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
+    case plan
     case apps
     case stats
 
@@ -12,13 +13,15 @@ public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
-        case .apps: "Work Apps"
+        case .plan: "Closing Plan"
+        case .apps: "App Library"
         case .stats: "History"
         }
     }
 
     public var symbol: String {
         switch self {
+        case .plan: "sunset.fill"
         case .apps: "square.grid.2x2"
         case .stats: "chart.bar.xaxis"
         }
@@ -47,7 +50,9 @@ public final class EndOfDayModel {
     public private(set) var lastTriggerDate: Date?
 
     // Workspace state
+    public private(set) var installedApps: [AppEntry] = []
     public private(set) var runningWorkApps: [RunningAppInfo] = []
+    public private(set) var allRunningApps: [RunningAppInfo] = []
     public private(set) var allRunningBundleIDs: Set<String> = []
     public private(set) var installedBundleIDs: Set<String> = []
 
@@ -61,8 +66,9 @@ public final class EndOfDayModel {
     public var lastError: String?
 
     // Window navigation state
-    public var selectedSidebarSection: SidebarSection = .apps
+    public var selectedSidebarSection: SidebarSection = .plan
     public var appSearchQuery: String = ""
+    public var selectedCategoryFilter: String = "All"
     public var showUninstalledApps: Bool = false
 
     private let configStore: ConfigStore
@@ -85,7 +91,9 @@ public final class EndOfDayModel {
         self.observeSystem = observeSystem
         self.summonTheme = SummonTheme.loadCurrent()
 
-        let installed = observeSystem ? AppCatalog.installedBundleIdentifiers() : ["com.microsoft.Outlook", "com.tinyspeck.slackmacgap", "com.google.Chrome", "com.microsoft.VSCode"]
+        let discovered = observeSystem ? AppCatalog.discoverInstalledApplications() : AppCatalog.entries
+        self.installedApps = discovered
+        let installed = Set(discovered.map(\.bundleIdentifier))
         self.installedBundleIDs = installed
 
         do {
@@ -136,14 +144,55 @@ public final class EndOfDayModel {
         return ScheduleEngine.formattedTime(hour: config.triggerHour, minute: config.triggerMinute)
     }
 
+    public var availableCategories: [String] {
+        var set = Set(installedApps.map(\.category))
+        let preferred = ["Office", "Communication", "Browsers", "Productivity", "Dev", "Design", "Remote/IT", "Other"]
+        var result = ["All"]
+        for cat in preferred where set.contains(cat) {
+            result.append(cat)
+            set.remove(cat)
+        }
+        result.append(contentsOf: set.sorted())
+        return result
+    }
+
+    public var filteredInstalledApps: [AppEntry] {
+        let query = appSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let selectedCat = selectedCategoryFilter
+        let source = installedApps.isEmpty ? AppCatalog.entries : installedApps
+        return source.filter { entry in
+            if selectedCat != "All" && entry.category != selectedCat {
+                return false
+            }
+            if !query.isEmpty {
+                return entry.canonicalName.lowercased().contains(query)
+                    || entry.category.lowercased().contains(query)
+                    || entry.bundleIdentifier.lowercased().contains(query)
+            }
+            return true
+        }
+    }
+
     public var filteredCatalogByCategory: [(category: String, entries: [AppEntry])] {
         let query = appSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let base = AppCatalog.entriesByCategory()
-        return base.compactMap { group in
-            let filtered = group.entries.filter { entry in
+        let source = installedApps.isEmpty ? AppCatalog.entries : installedApps
+        let grouped = Dictionary(grouping: source, by: \.category)
+        let preferredOrder = ["Office", "Communication", "Browsers", "Productivity", "Dev", "Design", "Remote/IT", "Other"]
+        var categories = preferredOrder.filter { grouped[$0] != nil }
+        for cat in grouped.keys.sorted() where !categories.contains(cat) {
+            categories.append(cat)
+        }
+
+        return categories.compactMap { cat in
+            guard let entries = grouped[cat] else { return nil }
+            let filtered = entries.filter { entry in
+                if selectedCategoryFilter != "All" && entry.category != selectedCategoryFilter {
+                    return false
+                }
                 if !query.isEmpty {
                     return entry.canonicalName.lowercased().contains(query)
                         || entry.category.lowercased().contains(query)
+                        || entry.bundleIdentifier.lowercased().contains(query)
                 }
                 if showUninstalledApps {
                     return true
@@ -154,8 +203,39 @@ public final class EndOfDayModel {
                     || allRunningBundleIDs.contains(id)
             }
             guard !filtered.isEmpty else { return nil }
-            return (category: group.category, entries: filtered)
+            return (category: cat, entries: filtered)
         }
+    }
+
+    /// Apps in plan that are currently NOT running
+    public var planInactiveApps: [AppEntry] {
+        config.apps.compactMap { bundleID in
+            guard !allRunningBundleIDs.contains(bundleID) else { return nil }
+            if let found = installedApps.first(where: { $0.bundleIdentifier == bundleID }) {
+                return found
+            }
+            let name = AppCatalog.displayName(for: bundleID, customNames: config.appDisplayNames)
+            let cat = AppCatalog.category(for: bundleID)
+            return AppEntry(
+                bundleName: name,
+                canonicalName: name,
+                category: cat,
+                bundleIdentifier: bundleID
+            )
+        }
+    }
+
+    /// Running regular user apps that are NOT currently in the closing plan
+    public var unmanagedRunningApps: [RunningAppInfo] {
+        allRunningApps.filter { app in
+            !config.isSelected(app.bundleIdentifier)
+        }
+    }
+
+    /// Closed runs recorded today
+    public var todayClosedEntries: [AnalyticsEntry] {
+        let todayStr = AnalyticsStore.dateString(from: Date())
+        return analyticsEntries.filter { $0.date == todayStr && $0.appsClosed > 0 }
     }
 
     // MARK: - Actions
@@ -167,13 +247,23 @@ public final class EndOfDayModel {
                 RunningAppInfo(bundleIdentifier: "com.tinyspeck.slackmacgap", localizedName: "Slack"),
                 RunningAppInfo(bundleIdentifier: "com.google.Chrome", localizedName: "Google Chrome"),
             ]
-            allRunningBundleIDs = Set(runningWorkApps.map(\.bundleIdentifier))
+            allRunningApps = runningWorkApps + [
+                RunningAppInfo(bundleIdentifier: "com.microsoft.VSCode", localizedName: "Visual Studio Code"),
+                RunningAppInfo(bundleIdentifier: "com.spotify.client", localizedName: "Spotify")
+            ]
+            allRunningBundleIDs = Set(allRunningApps.map(\.bundleIdentifier))
             return
+        }
+
+        if installedApps.isEmpty {
+            installedApps = AppCatalog.discoverInstalledApplications()
+            installedBundleIDs = Set(installedApps.map(\.bundleIdentifier))
         }
 
         let workspaceApps = NSWorkspace.shared.runningApplications
         var runningIDs = Set<String>()
         var infos: [RunningAppInfo] = []
+        var allInfos: [RunningAppInfo] = []
 
         for app in workspaceApps {
             guard app.activationPolicy == .regular,
@@ -184,17 +274,18 @@ public final class EndOfDayModel {
             runningIDs.insert(bundleID)
             let name = app.localizedName ?? AppCatalog.displayName(for: bundleID, customNames: config.appDisplayNames)
             let priority = AppCatalog.priority(for: bundleID, overrides: config.appPriorities)
-            infos.append(
-                RunningAppInfo(
-                    bundleIdentifier: bundleID,
-                    localizedName: name,
-                    category: AppCatalog.category(for: bundleID),
-                    priority: priority
-                )
+            let info = RunningAppInfo(
+                bundleIdentifier: bundleID,
+                localizedName: name,
+                category: AppCatalog.category(for: bundleID),
+                priority: priority
             )
+            allInfos.append(info)
+            infos.append(info)
         }
 
         allRunningBundleIDs = runningIDs
+        allRunningApps = allInfos.sorted { $0.localizedName.localizedCaseInsensitiveCompare($1.localizedName) == .orderedAscending }
         runningWorkApps = TerminationEngine.matchingRunningApps(running: infos, config: config)
     }
 
@@ -395,6 +486,20 @@ public final class EndOfDayModel {
     public func toggleApp(_ bundleID: String, displayName: String? = nil) {
         config.toggleApp(bundleID, displayName: displayName)
         saveConfig()
+    }
+
+    public func addAppToPlan(_ bundleID: String, displayName: String? = nil) {
+        if !config.isSelected(bundleID) {
+            config.toggleApp(bundleID, displayName: displayName)
+            saveConfig()
+        }
+    }
+
+    public func removeAppFromPlan(_ bundleID: String) {
+        if config.isSelected(bundleID) {
+            config.toggleApp(bundleID)
+            saveConfig()
+        }
     }
 
     public func selectAllCatalogApps() {
