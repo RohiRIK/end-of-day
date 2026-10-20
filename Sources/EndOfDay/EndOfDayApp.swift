@@ -39,6 +39,9 @@ struct EndOfDayApp: App {
                 }
         } label: {
             MenuBarLabel(model: model)
+                .onAppear {
+                    setupReopenHandler()
+                }
         }
         .menuBarExtraStyle(.window)
 
@@ -49,7 +52,6 @@ struct EndOfDayApp: App {
                 }
         }
         .defaultSize(width: 780, height: 520)
-        .defaultLaunchBehavior(.suppressed)
         .commands {
             EndOfDayCommands(model: model)
         }
@@ -62,12 +64,12 @@ struct EndOfDayApp: App {
 
     private func setupReopenHandler() {
         appDelegate.openWindowAction = {
-            openMainWindow(model: model, section: .apps, openWindow: openWindow)
+            openMainWindow(model: model, section: .plan, openWindow: openWindow)
         }
         let args = CommandLine.arguments
         if args.contains("--window") || args.contains("--open") || args.contains("-o") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                openMainWindow(model: model, section: .apps, openWindow: openWindow)
+                openMainWindow(model: model, section: .plan, openWindow: openWindow)
             }
         }
     }
